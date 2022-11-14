@@ -38,4 +38,11 @@ li .close {
   position: relative;
   bottom: 15px;
   left: 5px;
+  text-decoration: none;
+}
+
+.close {
+  margin-left: 20px;
+  color: red;
+  font-size: 20px;
 }
