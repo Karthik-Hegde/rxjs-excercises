@@ -1,32 +1,51 @@
+const {
+  fromEvent,
+  pipe,
+  startWith,
+  map,
+  flatMap,
+  combineLatestWith,
+  mergeWith,
+  switchMap,
+  tap,
+} = rxjs;
+const { fromFetch } = rxjs.fetch;
+
 const refreshButton = document.querySelector(".refresh");
 const closeButton1 = document.querySelector(".close1");
 const closeButton2 = document.querySelector(".close2");
 const closeButton3 = document.querySelector(".close3");
 
-const refreshClickStream = Rx.Observable.fromEvent(refreshButton, "click");
-const close1ClickStream = Rx.Observable.fromEvent(closeButton1, "click");
-const close2ClickStream = Rx.Observable.fromEvent(closeButton2, "click");
-const close3ClickStream = Rx.Observable.fromEvent(closeButton3, "click");
+const refreshClickStream = fromEvent(refreshButton, "click");
+const close1ClickStream = fromEvent(closeButton1, "click");
+const close2ClickStream = fromEvent(closeButton2, "click");
+const close3ClickStream = fromEvent(closeButton3, "click");
 
-const requestStream = refreshClickStream.startWith("startup click").map(() => {
-  const randomOffset = Math.floor(Math.random() * 500);
-  return "https://api.github.com/users?since=" + randomOffset;
-});
+const requestStream = refreshClickStream.pipe(
+  startWith("startup click"),
+  map(() => {
+    const randomOffset = Math.floor(Math.random() * 500);
+    return "https://api.github.com/users?since=" + randomOffset;
+  })
+);
 
-const responseStream = requestStream.flatMap((requestUrl) =>
-  Rx.Observable.fromPromise($.getJSON(requestUrl))
+const responseStream = requestStream.pipe(
+  flatMap((requestUrl) =>
+    fromFetch(requestUrl).pipe(switchMap((res) => res.json()))
+  )
 );
 
 function createSuggestionStream(closeClickStream) {
-  return closeClickStream
-    .startWith("startup click")
-    .combineLatest(
-      responseStream,
-      (click, listUsers) =>
+  return closeClickStream.pipe(
+    startWith("startup click"),
+    combineLatestWith(responseStream),
+    map(
+      ([click, listUsers]) =>
         listUsers[Math.floor(Math.random() * listUsers.length)]
-    )
-    .merge(refreshClickStream.map(() => null))
-    .startWith(null);
+    ),
+    mergeWith(refreshClickStream.pipe(map(() => null))),
+    startWith(null)
+  );
 }
 
 const suggestion1Stream = createSuggestionStream(close1ClickStream);
@@ -35,7 +54,7 @@ const suggestion3Stream = createSuggestionStream(close3ClickStream);
 
 function renderSuggestion(suggestedUser, selector) {
   const suggestionEl = document.querySelector(selector);
-  if (suggestedUser === null) {
+  if (suggestedUser === null || suggestedUser === undefined) {
     suggestionEl.style.visibility = "hidden";
   } else {
     suggestionEl.style.visibility = "visible";
